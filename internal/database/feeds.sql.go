@@ -54,6 +54,53 @@ func (q *Queries) CreateFeed(ctx context.Context, arg CreateFeedParams) (Feed, e
 	return i, err
 }
 
+const createFeedFollows = `-- name: CreateFeedFollows :one
+INSERT INTO feed_follows (id, created_at, updated_at, user_id, feed_id)
+VALUES ($1, 
+        $2, 
+        $3, 
+        $4, 
+        $5
+)
+RETURNING id, created_at, updated_at, user_id, feed_id
+`
+
+type CreateFeedFollowsParams struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	UserID    uuid.UUID
+	FeedID    uuid.UUID
+}
+
+func (q *Queries) CreateFeedFollows(ctx context.Context, arg CreateFeedFollowsParams) (FeedFollow, error) {
+	row := q.db.QueryRowContext(ctx, createFeedFollows,
+		arg.ID,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+		arg.UserID,
+		arg.FeedID,
+	)
+	var i FeedFollow
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.UserID,
+		&i.FeedID,
+	)
+	return i, err
+}
+
+const deleteFeedFollows = `-- name: DeleteFeedFollows :exec
+DELETE FROM feed_follows WHERE id = $1
+`
+
+func (q *Queries) DeleteFeedFollows(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteFeedFollows, id)
+	return err
+}
+
 const getAllFeeds = `-- name: GetAllFeeds :many
 SELECT id, created_at, updated_at, name, url, user_id from feeds
 `
@@ -74,6 +121,39 @@ func (q *Queries) GetAllFeeds(ctx context.Context) ([]Feed, error) {
 			&i.Name,
 			&i.Url,
 			&i.UserID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFeedFollows = `-- name: GetFeedFollows :many
+SELECT id, created_at, updated_at, user_id, feed_id from feed_follows WHERE user_id = $1
+`
+
+func (q *Queries) GetFeedFollows(ctx context.Context, userID uuid.UUID) ([]FeedFollow, error) {
+	rows, err := q.db.QueryContext(ctx, getFeedFollows, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FeedFollow
+	for rows.Next() {
+		var i FeedFollow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UserID,
+			&i.FeedID,
 		); err != nil {
 			return nil, err
 		}
