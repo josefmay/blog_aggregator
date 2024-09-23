@@ -39,3 +39,14 @@ func (cfg *apiConfig) handlerFeedsCreate(w http.ResponseWriter, r *http.Request,
 
 	respondWithJSON(w, http.StatusOK, databaseFeedToFeed(feed))
 }
+
+func (cfg *apiConfig) handlerFeedsGet(w http.ResponseWriter, r *http.Request) {
+	feeds, err := cfg.DB.GetAllFeeds(r.Context())
+	if err != nil {
+		log.Println(err)
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get feeds")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, databaseFeedsToFeeds(feeds))
+}
